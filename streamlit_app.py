@@ -1,4 +1,3 @@
-streamlit_app.py
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -63,34 +62,28 @@ if plate_file and sample_file and exp_file:
     if results_file:
         results = pd.read_csv(results_file)
 
-        # Standard QuantaSoft column names (adjust if yours are different)
-        if "Concentration FAM (copies/µL)" not in results.columns:
-            st.warning("Couldn’t find FAM/VIC concentration columns – trying common alternatives...")
-            fam_col = next((c for c in results.columns if "FAM" in c and "Conc" in c), None)
-            vic_col = next((c for c in results.columns if "VIC" in c and "Conc" in c), None)
-        else:
-            fam_col = "Concentration FAM (copies/µL)"
-            vic_col = "Concentration VIC (copies/µL)"
+        # Try to find FAM and VIC concentration columns automatically
+        fam_col = None
+        vic_col = None
+        for col in results.columns:
+            if "FAM" in col.upper() and ("CONC" in col.upper() or "COPIES" in col.upper()):
+                fam_col = col
+            if "VIC" in col.upper() and ("CONC" in col.upper() or "COPIES" in col.upper()):
+                vic_col = col
 
-        if fam_col and vic_col:
+        if fam_col and vic_col and "Well" in results.columns:
             results = results[["Well", fam_col, vic_col]].copy()
             results.columns = ["Well", "FAM", "VIC"]
 
-            # Merge with metadata
             final = full.merge(results, on="Well", how="left")
-
-            # Normalize CN/DG = FAM / VIC
             final["CN/DG"] = final["FAM"] / final["VIC"]
 
-            # Default colors exactly like your Prism graphs
-            color_map = {"Treated": "lightpink", "Untreated": "lightblue", "Naive": "lightgray", "NTC": "whitesmoke"}
-
-            # Sidebar live color picker (optional but cool)
+            # Colors
+            color_map = {"Treated": "lightpink", "Untreated": "lightblue", "Naïve": "lightgray", "NTC": "whitesmoke", "Naive": "lightgray"}
             st.sidebar.header("🎨 Change bar colors live")
-            for tr in ["Treated", "Untreated", "Naive", "NTC"]:
-                color_map[tr] = st.sidebar.color_picker(tr, color_map[tr], key=tr)
+            for tr in ["Treated", "Untreated", "Naïve", "NTC"]:
+                color_map[tr] = st.sidebar.color_picker(tr, color_map.get(tr, "gray"), key=tr)
 
-            # Graph per Study ID
             for study in final["Study ID"].dropna().unique():
                 df = final[final["Study ID"] == study].copy()
                 df["Group"] = df["Treatment"].fillna("Unknown")
@@ -99,7 +92,7 @@ if plate_file and sample_file and exp_file:
                 for treatment in df["Group"].unique():
                     sub = df[df["Group"] == treatment]
                     mean_val = sub["CN/DG"].mean()
-                    sem_val = sub["CN/DG"].sem() if len(sub)>1 else 0
+                    sem_val = sub["CN/DG"].sem() if len(sub) > 1 else 0
 
                     fig.add_trace(go.Bar(
                         name=treatment,
@@ -109,7 +102,6 @@ if plate_file and sample_file and exp_file:
                         marker_color=color_map.get(treatment, "gray"),
                         width=0.6
                     ))
-                    # Individual black dots
                     fig.add_trace(go.Scatter(
                         x=[treatment] * len(sub),
                         y=sub["CN/DG"],
@@ -118,25 +110,23 @@ if plate_file and sample_file and exp_file:
                         showlegend=False
                     ))
 
-                # Naïve reference diagonal label (exactly like your example)
-                naive_rows = df[df["Treatment"] == "Naive"]
-                if not naive_rows.empty:
-                    naive_name = naive_rows.iloc[0]["Sample Name"].split("_")[0] + " NQ-reference"
-                    fig.add_annotation(text=naive_name, x="Naive", y=mean_val*0.8,
-                                       showarrow=False, textangle=-35,
-                                       font=dict(size=12, color="gray"))
+                # Naïve diagonal label
+                naive_rows = df[df["Treatment"] == "Naïve"]
+                if not naive_rows.empty and mean_val > 0:
+                    naive_name = naive_rows.iloc[0]["Animal"] + " Naïve reference"
+                    fig.add_annotation(text=naive_name, x="Naïve", y=mean_val * 0.6,
+                                       showarrow=False, textangle=-35, font=dict(size=12, color="gray"))
 
                 fig.update_layout(
-                    title=f"<b>{study}</b> – {df.iloc[0]['Tissue Type']} – Day {df.iloc[0]['Takedown Day']}<br>Normalized CN/DG ({df.iloc[0]['FAM p/p']} / {df.iloc[0]['VIC p/p']})",
+                    title=f"<b>{study}</b> – {df.iloc[0]['Tissue Type']} – Day {df.iloc[0]['Takedown Day']}<br>Normalized CN/DG",
                     yaxis_title="CN/DG",
                     template="simple_white",
                     font=dict(size=18),
                     height=700
                 )
                 st.plotly_chart(fig, use_container_width=True)
-
                 png = fig.to_image(format="png", width=1200, height=800, scale=2)
-                st.download_button(f"📸 Download {study} figure (PNG)", png, f"{study}_CN_DG.png", "image/png", key=study)
+                st.download_button(f"📸 Download {study} figure", png, f"{study}_CN_DG.png", "image/png", key=study)
 
 else:
-    st.info("Upload the three files above to get started. When your run is finished, come back and drop the QuantaSoft results CSV for instant graphs.")
+    st.info("Upload the three files above to get started. When your run is finished, drop the QuantaSoft results CSV for instant graphs.")
