@@ -1,3 +1,15 @@
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+import openpyxl
+import io
+import base64
+
+# =============================================================================
+# NHP / FST ddPCR Plate Planner & Analyzer
+# Version: Clean + Sectioned for Easy Future Updates
+# =============================================================================
+
 # ====================== SECTION 0: LOCK YOUR GOLDEN EXCEL TEMPLATE (DO THIS ONCE) ======================
 st.markdown("## Lock Your Lab's Golden Excel Template (One-Time Setup)")
 
@@ -19,15 +31,6 @@ else:
             del st.session_state.golden_locked
             del st.session_state.golden_template
         st.experimental_rerun()
-
-# =============================================================================
-# NHP / FST ddPCR Plate Planner & Analyzer
-# Version: Clean + Sectioned for Easy Future Updates
-# =============================================================================
-
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
 
 # ====================== SECTION 1: PAGE CONFIG & TITLE ======================
 st.set_page_config(page_title="NHP ddPCR Analyzer", layout="wide")
@@ -371,6 +374,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
