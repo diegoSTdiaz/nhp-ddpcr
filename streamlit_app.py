@@ -232,7 +232,16 @@ if results_file and plate_file and sample_file and st.session_state.get("golden_
 
     # Load your locked golden template
     wb = openpyxl.load_workbook(io.BytesIO(st.session_state.golden_template), data_only=False)
-    ws = wb["Raw data"]
+    
+    # ULTRA-ROBUST SHEET FINDER – works even with trailing spaces, different case, etc.
+    ws = None
+    for sheet_name in wb.sheetnames:
+        if "raw" in sheet_name.lower() and "data" in sheet_name.lower():
+            ws = wb[sheet_name]
+            break
+    if ws is None:
+        st.error(f"Could not find 'Raw data' sheet. Available sheets: {wb.sheetnames}")
+        st.stop()
 
     # === Step 1: Parse results file robustly (FAM/VIC per well) ===
     results = pd.read_csv(results_file)
@@ -417,6 +426,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
