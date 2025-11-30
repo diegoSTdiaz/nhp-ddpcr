@@ -146,11 +146,12 @@ if plate_file and sample_file:
     st.success(f"Mapping complete! {annotated_count} wells fully annotated.")
     st.dataframe(full, use_container_width=True)
     st.download_button(
-        "Download Annotated Plate",
-        full.to_csv(index=False),
-        "annotated_plate_with_metadata.csv",
-        "text/csv"
-
+    label="Download Annotated Plate with Metadata",
+    data=full.to_csv(index=False).encode(),           # .encode() is safer in some Streamlit versions
+    file_name="annotated_plate_with_metadata.csv",
+    mime="text/csv",
+    key="download_annotated"                          # prevents duplicate widget errors
+)
 # ====================== SECTION 6: PROCESS RESULTS (IF UPLOADED) ======================
     if results_file:
         results = pd.read_csv(results_file)
@@ -285,6 +286,7 @@ if plate_file and sample_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
