@@ -257,17 +257,22 @@ if results_file and plate_file and sample_file and st.session_state.get("golden_
     st.dataframe(final_grid.style.format("{:.3f}"))
 
 # ====================== SECTION 7: SIDEBAR – BAR COLOR PICKER ======================
-        color_map = {
-            "Treated": "lightpink",
-            "Untreated": "lightblue",
-            "Naïve": "lightgray",
-            "Naive": "lightgray",
-            "NTC": "whitesmoke"
-        }
-        st.sidebar.header("Bar colors")
-        for tr in ["Treated", "Untreated", "Naïve", "NTC"]:
-            color_map[tr] = st.sidebar.color_picker(tr, color_map.get(tr, "gray"), key=f"color_{tr}")
+if results_file:
+    color_map = {
+        "Treated": "lightpink",
+        "Untreated": "lightblue",
+        "Naïve": "lightgray",
+        "Naive": "lightgray",      # catches both spellings
+        "NTC": "whitesmoke"
+    }
 
+    st.sidebar.header("Bar colors")
+    for tr in ["Treated", "Untreated", "Naïve", "NTC"]:
+        color_map[tr] = st.sidebar.color_picker(
+            label=tr,
+            value=color_map.get(tr, "gray"),
+            key=f"color_{tr}"
+        )
 # ====================== SECTION 8: GENERATE PLOTS PER STUDY ======================
         for study in sorted(final["Study ID"].dropna().unique()):
             df = final[final["Study ID"] == study].copy()
@@ -366,6 +371,7 @@ if results_file and plate_file and sample_file and st.session_state.get("golden_
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
