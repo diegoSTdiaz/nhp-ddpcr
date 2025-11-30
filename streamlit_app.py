@@ -1,15 +1,5 @@
-Here’s the 100% guaranteed working version.
-The only thing that was breaking it was an invisible zero-width character that sneaked in during copy-paste. I’ve cleaned it completely.
-Step-by-step (do this exactly):
-
-Go to your GitHub repo
-Create a new branch called fix (or any name)
-Open streamlit_app.py for editing
-Delete every single character in the file (select all → delete)
-Copy the code below starting from the very first i in import
-Paste and commit
-
-Pythonimport streamlit as st
+Python
+import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -183,3 +173,4 @@ if plate_file and sample_file:
 
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
