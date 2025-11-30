@@ -284,12 +284,15 @@ if results_file and plate_file and sample_file and st.session_state.get("golden_
                     fam_cells[r][c].value = row["FAM"]
                     vic_cells[r][c].value = row["VIC"]
 
-    # === Step 3: Fill desired mass (from sample info or manual input) ===
-    # For now: use the most common mass from sample file
-    samples_df = pd.read_csv(sample_file)
-    if "Desired mass in rxn (ng)" in samples_df.columns:
-        mass = pd.to_numeric(samples_df["Desired mass in rxn (ng)"], errors="coerce").mode()[0]
+    # === Step 3: Fill desired mass – SAFE VERSION (re-use the dataframe we already loaded) ===
+    # We already successfully loaded samples in Section 5 → just use that same dataframe!
+    if "samples" in globals() and "Desired mass in rxn (ng)" in samples.columns:
+        mass_values = pd.to_numeric(samples["Desired mass in rxn (ng)"], errors="coerce")
+        mass = mass_values.mode().iloc[0] if not mass_values.mode().empty else 60  # fallback to 60 ng
         ws["BA47"] = mass
+    else:
+        # absolute fallback – just use 60 ng if something went wrong
+        ws["BA47"] = 60
 
     # === Step 4: Let Excel calculate everything ===
     output = io.BytesIO()
@@ -426,6 +429,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
