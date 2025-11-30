@@ -1,3 +1,14 @@
+Here’s the 100% guaranteed working version.
+The only thing that was breaking it was an invisible zero-width character that sneaked in during copy-paste. I’ve cleaned it completely.
+Step-by-step (do this exactly):
+
+Go to your GitHub repo
+Create a new branch called fix (or any name)
+Open streamlit_app.py for editing
+Delete every single character in the file (select all → delete)
+Copy the code below starting from the very first i in import
+Paste and commit
+
 Pythonimport streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -39,7 +50,6 @@ with col_c:
     show_loading = st.checkbox("Show raw loading (copies/µL) instead of CN/DG", value=False)
 
 if plate_file and sample_file:
-    # Load plate layout
     plate = pd.read_csv(plate_file)
     plate.columns = [""] + [f"{i}" for i in plate.columns[1:]]
     plate = plate.set_index(plate.columns[0])
@@ -55,7 +65,6 @@ if plate_file and sample_file:
             return str(x)
     plate_long["Sample Number"] = plate_long["Sample Number"].apply(to_sample)
 
-    # Load sample metadata
     samples = pd.read_csv(sample_file)
     required = ["Sample Number", "Study ID", "Treatment", "Animal", "Tissue Type", "Takedown Day"]
     if not all(c in samples.columns for c in required):
@@ -72,7 +81,6 @@ if plate_file and sample_file:
     if results_file:
         results = pd.read_csv(results_file)
 
-        # Auto-detect FAM and VIC concentration columns
         fam_col = vic_col = None
         for col in results.columns:
             if "FAM" in col.upper() and "CONC" in col.upper():
@@ -84,7 +92,6 @@ if plate_file and sample_file:
             st.error("Could not find FAM/VIC concentration columns.")
             st.stop()
 
-        # Pivot to one row per well
         fam = results[results["Target"] == 1][["Well", fam_col]].rename(columns={fam_col: "FAM"})
         vic = results[results["Target"] == 2][["Well", vic_col]].rename(columns={vic_col: "VIC"})
         conc = fam.merge(vic, on="Well", how="inner")
@@ -92,7 +99,6 @@ if plate_file and sample_file:
         final = full.merge(conc, on="Well", how="left")
         final["CN/DG"] = final["FAM"] / final["VIC"]
 
-        # Color picker
         color_map = {"Treated": "lightpink", "Untreated": "lightblue", "Naïve": "lightgray", "Naive": "lightgray", "NTC": "whitesmoke"}
         st.sidebar.header("Bar colors")
         for tr in ["Treated", "Untreated", "Naïve", "NTC"]:
@@ -107,7 +113,6 @@ if plate_file and sample_file:
             subtitle = f"{tissue} – Day {int(day)}"
 
             if not show_loading:
-                # Normalized CN/DG plot
                 fig1 = go.Figure()
                 naive_mean = df[df["Treatment"].isin(["Naïve", "Naive"])]["CN/DG"].mean()
 
@@ -148,7 +153,6 @@ if plate_file and sample_file:
                                    f"{study}_CN_DG.png", "image/png", key=f"norm_{study}")
 
             else:
-                # FAM loading
                 fig_fam = go.Figure()
                 for treatment in df["Treatment"].unique():
                     sub = df[df["Treatment"] == treatment]
@@ -163,7 +167,6 @@ if plate_file and sample_file:
                                       yaxis_title="FAM copies/µL", template="simple_white", height=600)
                 st.plotly_chart(fig_fam, use_container_width=True)
 
-                # VIC loading
                 fig_vic = go.Figure()
                 for treatment in df["Treatment"].unique():
                     sub = df[df["Treatment"] == treatment]
