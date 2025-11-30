@@ -9,15 +9,15 @@ st.markdown("Upload your 3 Benchling/QuantaSoft files below – everything happe
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.subheader("1. Plate Layout (Well1.csv)")
+    st.subheader("1. Plate Layout")
     plate_file = st.file_uploader("Plate layout with sample numbers in wells", type=["csv"], key="plate")
 
 with col2:
-    st.subheader("2. Sample Info (Study-info-Paste-in-to-app.csv)")
+    st.subheader("2. Sample Info")
     sample_file = st.file_uploader("Sample metadata with Sample Number → Treatment etc.", type=["csv"], key="samples")
 
 with col3:
-    st.subheader("3. Experiment Info (Experiment-information-Paste-in-to-app.csv)")
+    st.subheader("3. Experiment Info")
     exp_file = st.file_uploader("Study → Tissue, Assay, Day", type=["csv"], key="exp")
 
 # Optional – real results when the run is done
@@ -130,3 +130,4 @@ if plate_file and sample_file and exp_file:
 
 else:
     st.info("Upload the three files above to get started. When your run is finished, drop the QuantaSoft results CSV for instant graphs.")
+
