@@ -339,10 +339,9 @@ if results_file:
         "Treated": "lightpink",
         "Untreated": "lightblue",
         "Naïve": "lightgray",
-        "Naive": "lightgray",      # catches both spellings
+        "Naive": "lightgray", # catches both spellings
         "NTC": "whitesmoke"
     }
-
     st.sidebar.header("Bar colors")
     for tr in ["Treated", "Untreated", "Naïve", "NTC"]:
         color_map[tr] = st.sidebar.color_picker(
@@ -448,6 +447,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
