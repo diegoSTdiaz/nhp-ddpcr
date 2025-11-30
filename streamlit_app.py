@@ -107,16 +107,16 @@ if plate_file and sample_file:
 
     st.success("Plate layout parsed perfectly (bulletproof mode enabled)")
 
-# ====================== SECTION 5: LOAD SAMPLE METADATA (BULLETPROOF PARSER) ======================
+# ====================== SECTION 5: LOAD SAMPLE METADATA (NOW INCLUDES MASS) ======================
     samples_raw = pd.read_csv(sample_file)
 
-    # --- Hard-coded expected columns (exact names and order) ---
+    # --- Expected columns (now including mass) ---
     expected_sample_cols = [
         "Sample Number", "Study ID", "Treatment",
         "Animal", "Tissue Type", "Takedown Day", "Desired mass in rxn (ng)"
     ]
 
-    # Auto-map uploaded columns to expected ones (case-insensitive, flexible)
+    # Auto-map uploaded columns (still flexible)
     col_map = {}
     for expected in expected_sample_cols:
         for uploaded_col in samples_raw.columns:
@@ -124,20 +124,25 @@ if plate_file and sample_file:
                 col_map[expected] = uploaded_col
                 break
         else:
-            st.error(f"Could not find column for required field: **{expected}**")
-            st.stop()
+            if expected != "Desired mass in rxn (ng)":  # mass is optional for now
+                st.error(f"Could not find required column: **{expected}**")
+                st.stop()
 
-    # Build clean samples dataframe with exact expected columns
+    # Build clean samples dataframe
     samples = pd.DataFrame()
     for expected in expected_sample_cols:
-        samples[expected] = samples_raw[col_map[expected]]
+        if expected in col_map:
+            samples[expected] = samples_raw[col_map[expected]]
+        else:
+            samples[expected] = pd.NA  # only happens for mass if missing
 
-    # Final cleanup
+    # Cleanup
     samples["Sample Number"] = samples["Sample Number"].astype(str).str.strip()
     samples["Study ID"] = samples["Study ID"].astype(str).str.strip()
     samples["Treatment"] = samples["Treatment"].str.strip()
     samples["Tissue Type"] = samples["Tissue Type"].str.strip()
     samples["Takedown Day"] = pd.to_numeric(samples["Takedown Day"], errors="coerce")
+    samples["Desired mass in rxn (ng)"] = pd.to_numeric(samples["Desired mass in rxn (ng)"], errors="coerce")
 
     # Merge with plate
     full = plate_long.merge(samples, on="Sample Number", how="left")
@@ -145,13 +150,14 @@ if plate_file and sample_file:
     annotated_count = len(full.dropna(subset=["Study ID"]))
     st.success(f"Mapping complete! {annotated_count} wells fully annotated.")
     st.dataframe(full, use_container_width=True)
+
     st.download_button(
-    label="Download Annotated Plate with Metadata",
-    data=full.to_csv(index=False).encode(),           # .encode() is safer in some Streamlit versions
-    file_name="annotated_plate_with_metadata.csv",
-    mime="text/csv",
-    key="download_annotated"                          # prevents duplicate widget errors
-)
+        label="Download Annotated Plate with Metadata",
+        data=full.to_csv(index=False).encode(),
+        file_name="annotated_plate_with_metadata.csv",
+        mime="text/csv",
+        key="download_annotated"
+    )
 # ====================== SECTION 6: PROCESS RESULTS (IF UPLOADED) ======================
     if results_file:
         results = pd.read_csv(results_file)
@@ -286,6 +292,7 @@ if plate_file and sample_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
