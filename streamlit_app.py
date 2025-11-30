@@ -46,16 +46,16 @@ st.subheader("Assay & Loading Settings")
 col_a, col_b, col_c = st.columns(3)
 
 with col_a:
-    fam_options = ["WPRE_5", "hAAT", "CMV", "EF1α", "Other..."]
+    fam_options = ["WPRE_5", "slot_1", "slot_2", "slot_3", "slot_4", "Other..."]
     fam_probe = st.selectbox("FAM target gene", options=fam_options, index=0)
     if fam_probe == "Other...":
-        fam_probe = st.text_input("Custom FAM target", "MyTarget")
+        fam_probe = st.text_input("Custom FAM target")
 
 with col_b:
     vic_options = ["Mf-B2M-VIC-PL", "Taqman_Rplp0_VIC_PL", "HPRT1-VIC", "GUSB-VIC", "Other..."]
     vic_probe = st.selectbox("VIC reference gene", options=vic_options, index=1)
     if vic_probe == "Other...":
-        vic_probe = st.text_input("Custom VIC reference", "MyReference")
+        vic_probe = st.text_input("Custom VIC reference")
 
 with col_c:
     show_loading = st.checkbox(
@@ -236,4 +236,5 @@ if plate_file and sample_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
