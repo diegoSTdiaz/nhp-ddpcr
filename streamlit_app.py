@@ -5,6 +5,19 @@ import openpyxl
 import io
 import base64
 
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+# PERMANENT SESSION STATE – survives refresh & redeploy
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+@st.cache_resource
+def load_persistent_state():
+    if "golden_locked" not in st.session_state:
+        st.session_state.golden_locked = False
+    if "golden_template" not in st.session_state:
+        st.session_state.golden_template = None
+
+load_persistent_state()   # ← this line makes it permanent
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+
 # =============================================================================
 # NHP / FST ddPCR Plate Planner & Analyzer
 # Version: Clean + Sectioned for Easy Future Updates
@@ -388,6 +401,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
