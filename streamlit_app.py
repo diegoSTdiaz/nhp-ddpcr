@@ -14,17 +14,17 @@ with col1:
 
 with col2:
     st.subheader("2. Sample Info (6 columns only)")
-    sample_file = st.file_uploader("Sample Number → Study ID, Treatment, Animal, Tissue Type, Takedown Day", type=["csv"], key="samples")
+    sample_file = st.file_uploader("Sample Number to Study ID, Treatment, Animal, Tissue Type, Takedown Day", type=["csv"], key="samples")
 
 st.markdown("---")
-results_file = st.file_uploader("Finished run → QuantaSoft/QX200 results CSV (optional now)", type=["csv"], key="results")
+results_file = st.file_uploader("Finished run to QuantaSoft/QX200 results CSV (optional now)", type=["csv"], key="results")
 
 st.markdown("---")
 st.subheader("Assay & Loading Settings")
 
 col_a, col_b, col_c = st.columns(3)
 with col_a:
-    fam_options = ["WPRE_5", "hAAT", "CMV", "EF1α", "Other..."]
+    fam_options = ["WPRE_5", "hAAT", "CMV", "EF1a", "Other..."]
     fam_probe = st.selectbox("FAM target gene", options=fam_options, index=0)
     if fam_probe == "Other...":
         fam_probe = st.text_input("Custom FAM target", "MyTarget")
@@ -88,9 +88,9 @@ if plate_file and sample_file:
         final = full.merge(conc, on="Well", how="left")
         final["CN/DG"] = final["FAM"] / final["VIC"]
 
-        color_map = {"Treated": "lightpink", "Untreated": "lightblue", "Naïve": "lightgray", "Naive": "lightgray", "NTC": "whitesmoke"}
+        color_map = {"Treated": "lightpink", "Untreated": "lightblue", "Naive": "lightgray", "Naive": "lightgray", "NTC": "whitesmoke"}
         st.sidebar.header("Bar colors")
-        for tr in ["Treated", "Untreated", "Naïve", "NTC"]:
+        for tr in ["Treated", "Untreated", "Naive", "NTC"]:
             color_map[tr] = st.sidebar.color_picker(tr, color_map.get(tr, "gray"), key=f"color_{tr}")
 
         for study in sorted(final["Study ID"].dropna().unique()):
@@ -99,11 +99,11 @@ if plate_file and sample_file:
 
             tissue = df["Tissue Type"].mode()[0]
             day = df["Takedown Day"].mode()[0]
-            subtitle = f"{tissue} – Day {int(day)}"
+            subtitle = f"{tissue} - Day {int(day)}"
 
             if not show_loading:
                 fig1 = go.Figure()
-                naive_mean = df[df["Treatment"].isin(["Naïve", "Naive"])]["CN/DG"].mean()
+                naive_mean = df[df["Treatment"].isin(["Naive", "Naive"])]["CN/DG"].mean()
 
                 for treatment in df["Treatment"].unique():
                     sub = df[df["Treatment"] == treatment]
@@ -128,17 +128,17 @@ if plate_file and sample_file:
 
                 if not pd.isna(naive_mean):
                     fig1.add_hline(y=naive_mean, line_dash="dash", line_color="gray",
-                                   annotation_text=" Naïve reference", annotation_position="top left")
+                                   annotation_text=" Naive reference", annotation_position="top left")
 
                 fig1.update_layout(
-                    title=f"<b>{study}</b> – {subtitle}<br>{fam_probe} / {vic_probe} normalized CN/DG",
+                    title=f"<b>{study}</b> - {subtitle}<br>{fam_probe} / {vic_probe} normalized CN/DG",
                     yaxis_title="Copies per diploid genome (CN/DG)",
                     template="simple_white",
                     height=700,
                     font=dict(size=18)
                 )
                 st.plotly_chart(fig1, use_container_width=True)
-                st.download_button(f"Download {study} – Normalized", fig1.to_image(format="png", scale=2),
+                st.download_button(f"Download {study} - Normalized", fig1.to_image(format="png", scale=2),
                                    f"{study}_CN_DG.png", "image/png", key=f"norm_{study}")
 
             else:
@@ -152,7 +152,7 @@ if plate_file and sample_file:
                         error_y=dict(type="data", array=[sub["FAM"].sem()]),
                         marker_color=color_map.get(treatment, "gray")
                     ))
-                fig_fam.update_layout(title=f"<b>{study}</b> – {subtitle}<br>{fam_probe} loading (copies/µL)",
+                fig_fam.update_layout(title=f"<b>{study}</b> - {subtitle}<br>{fam_probe} loading (copies/µL)",
                                       yaxis_title="FAM copies/µL", template="simple_white", height=600)
                 st.plotly_chart(fig_fam, use_container_width=True)
 
@@ -166,7 +166,7 @@ if plate_file and sample_file:
                         error_y=dict(type="data", array=[sub["VIC"].sem()]),
                         marker_color=color_map.get(treatment, "gray")
                     ))
-                fig_vic.update_layout(title=f"<b>{study}</b> – {subtitle}<br>{vic_probe} loading (copies/µL)",
+                fig_vic.update_layout(title=f"<b>{study}</b> - {subtitle}<br>{vic_probe} loading (copies/µL)",
                                       yaxis_title="VIC copies/µL", template="simple_white", height=600)
                 st.plotly_chart(fig_vic, use_container_width=True)
 
