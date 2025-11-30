@@ -1,100 +1,122 @@
-import streamlit as st
+Pythonimport streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
 st.set_page_config(page_title="NHP ddPCR Analyzer", layout="wide")
-st.title("🧬 NHP / FST ddPCR Plate Planner & Analyzer")
-st.markdown("Upload your 3 Benchling/QuantaSoft files below – everything happens automatically.")
+st.title("NHP / FST ddPCR Plate Planner & Analyzer")
+st.markdown("**New & improved**: only 2 required files + smart assay selector")
 
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("1. Plate Layout")
-    plate_file = st.file_uploader("Plate layout with sample numbers in wells", type=["csv"], key="plate")
+    plate_file = st.file_uploader("Well1.csv or similar from Benchling/QuantaSoft", type=["csv"], key="plate")
 
 with col2:
-    st.subheader("2. Sample Info")
-    sample_file = st.file_uploader("Sample metadata with Sample Number → Treatment etc.", type=["csv"], key="samples")
+    st.subheader("2. Sample Info (6 columns only)")
+    sample_file = st.file_uploader("Sample Number → Study ID, Treatment, Animal, Tissue, Day", type=["csv"], key="samples")
 
-with col3:
-    st.subheader("3. Experiment Info")
-    exp_file = st.file_uploader("Study → Tissue, Assay, Day", type=["csv"], key="exp")
-
-# Optional – real results when the run is done
+# Optional results
 st.markdown("---")
-results_file = st.file_uploader("Finished run? Upload QuantaSoft/QX200 results CSV (optional now, required for graphs)", type=["csv"], key="results")
+results_file = st.file_uploader("Finished run → QuantaSoft/QX200 results CSV (optional now)", type=["csv"], key="results")
 
-if plate_file and sample_file and exp_file:
-    # ====================== Load & clean plate layout ======================
+# Assay selector (you’ll customize this list later)
+st.markdown("---")
+st.subheader("Assay & Loading Settings")
+
+col_a, col_b, col_c = st.columns(3)
+with col_a:
+    fam_options = ["WPRE_5", "hAAT", "CMV", "EF1α", "Other..."]
+    fam_probe = st.selectbox("FAM target gene", options=fam_options, index=0)
+    if fam_probe == "Other...":
+        fam_probe = st.text_input("Custom FAM target", "MyTarget")
+
+with col_b:
+    vic_options = ["Mf-B2M-VIC-PL", "Taqman_Rplp0_VIC_PL", "HPRT1-VIC", "GUSB-VIC", "Other..."]
+    vic_probe = st.selectbox("VIC reference gene", options=vic_options, index=1)
+    if vic_probe == "Other...":
+        vic_probe = st.text_input("Custom VIC reference", "MyReference")
+
+with col_c:
+    show_loading = st.checkbox("Show raw loading (copies/µL) instead of CN/DG", value=False)
+
+if plate_file and sample_file:
+    # ====================== Load plate layout ======================
     plate = pd.read_csv(plate_file)
-    # Fix the standard Bio-Rad empty first cell
     plate.columns = [""] + [f"{i}" for i in plate.columns[1:]]
     plate = plate.set_index(plate.columns[0])
     plate_long = plate.stack().reset_index()
     plate_long.columns = ["Row", "Column", "Sample Number"]
-    plate_long["Well"] = plate_long["Row"] + plate_long["Column"].str.replace(".0","")
+    plate_long["Well"] = plate_long["Row"] + plate_long["Column"].str.replace(".0", "")
     plate_long = plate_long[["Well", "Sample Number"]].dropna()
-    plate_long["Sample Number"] = plate_long["Sample Number"].astype(int)
+    try:
+        plate_long["Sample Number"] = plate_long["Sample Number"].astype(int)
+    except:
+        # Handle NTC text entries
+        plate_long["Sample Number"] = plate_long["Sample Number"].astype(str)
 
-    # ====================== Load metadata ======================
+    # ====================== Load sample metadata ======================
     samples = pd.read_csv(sample_file)
-    exp = pd.read_csv(exp_file)
-
-    # Required columns check
-    required = ["Sample Number", "Sample Name", "Study ID", "Treatment"]
+    required = ["Sample Number", "Study ID", "Treatment", "Animal", "Tissue Type", "Takedown Day"]
     if not all(c in samples.columns for c in required):
-        st.error("Sample file is missing one of these columns: " + ", ".join(required))
+        st.error(f"Sample Info missing columns. Needs: {', '.join(required)}")
         st.stop()
 
-    samples["Sample Number"] = samples["Sample Number"].astype(int)
-
-    # ====================== Merge everything ======================
+    # Merge
     full = plate_long.merge(samples, on="Sample Number", how="left")
-    full = full.merge(exp, on="Study ID", how="left")
 
-    st.success(f"Plate fully mapped! {len(full)} wells annotated.")
+    st.success(f"Plate mapped! {len(full.dropna(subset=['Study ID']))} wells annotated.")
     st.dataframe(full, use_container_width=True)
+    st.download_button("Download annotated plate", full.to_csv(index=False), "annotated_plate.csv", "text/csv")
 
-    csv = full.to_csv(index=False).encode()
-    st.download_button("📄 Download annotated plate CSV", csv, "ddPCR_full_plate.csv", "text/csv")
-
-    # ====================== If real results are uploaded → make your exact graphs ======================
     if results_file:
         results = pd.read_csv(results_file)
 
-        # Try to find FAM and VIC concentration columns automatically
-        fam_col = None
-        vic_col = None
+        # Auto-detect FAM and VIC concentration columns
+        fam_col = vic_col = None
         for col in results.columns:
-            if "FAM" in col.upper() and ("CONC" in col.upper() or "COPIES" in col.upper()):
+            if "FAM" in col.upper() and "CONC" in col.upper():
                 fam_col = col
-            if "VIC" in col.upper() and ("CONC" in col.upper() or "COPIES" in col.upper()):
+            if "VIC" in col.upper() and "CONC" in col.upper():
                 vic_col = col
 
-        if fam_col and vic_col and "Well" in results.columns:
-            results = results[["Well", fam_col, vic_col]].copy()
-            results.columns = ["Well", "FAM", "VIC"]
+        if not (fam_col and vic_col and "Well" in results.columns):
+            st.error("Could not find FAM/VIC concentration columns. Check your export.")
+            st.stop()
 
-            final = full.merge(results, on="Well", how="left")
-            final["CN/DG"] = final["FAM"] / final["VIC"]
+        # Pivot to one row per well
+        fam = results[results["Target"] == 1][["Well", fam_col]].rename(columns={fam_col: "FAM"})
+        vic = results[results["Target"] == 2][["Well", vic_col]].rename(columns={vic_col: "VIC"})
+        conc = fam.merge(vic, on="Well", how="inner")
 
-            # Colors
-            color_map = {"Treated": "lightpink", "Untreated": "lightblue", "Naïve": "lightgray", "NTC": "whitesmoke", "Naive": "lightgray"}
-            st.sidebar.header("🎨 Change bar colors live")
-            for tr in ["Treated", "Untreated", "Naïve", "NTC"]:
-                color_map[tr] = st.sidebar.color_picker(tr, color_map.get(tr, "gray"), key=tr)
+        final = full.merge(conc, on="Well", how="left")
+        final["CN/DG"] = final["FAM"] / final["VIC"]
 
-            for study in final["Study ID"].dropna().unique():
-                df = final[final["Study ID"] == study].copy()
-                df["Group"] = df["Treatment"].fillna("Unknown")
+        color_map = {"Treated": "lightpink", "Untreated": "lightblue", "Naïve": "lightgray", "Naive": "lightgray", "NTC": "whitesmoke"}
+        st.sidebar.header("Bar colors")
+        for tr in ["Treated", "Untreated", "Naïve", "NTC"]:
+            color_map[tr] = st.sidebar.color_picker(tr, color_map.get(tr, "gray"), key=f"color_{tr}")
 
-                fig = go.Figure()
-                for treatment in df["Group"].unique():
-                    sub = df[df["Group"] == treatment]
+        for study in final["Study ID"].dropna().unique():
+            df = final[final["Study ID"] == study].copy()
+            df = df.dropna(subset=["Treatment"])
+
+            # Common subtitle
+            tissue = df["Tissue Type"].mode()[0]
+            day = df["Takedown Day"].mode()[0]
+            subtitle = f"{tissue} – Day {int(day)}"
+
+            if not show_loading:
+                # 1. Normalized CN/DG
+                fig1 = go.Figure()
+                naive_mean = df[df["Treatment"].isin(["Naïve", "Naive"])]["CN/DG"].mean()
+
+                for treatment in df["Treatment"].unique():
+                    sub = df[df["Treatment"] == treatment]
                     mean_val = sub["CN/DG"].mean()
                     sem_val = sub["CN/DG"].sem() if len(sub) > 1 else 0
 
-                    fig.add_trace(go.Bar(
+                    fig1.add_trace(go.Bar(
                         name=treatment,
                         x=[treatment],
                         y=[mean_val],
@@ -102,32 +124,59 @@ if plate_file and sample_file and exp_file:
                         marker_color=color_map.get(treatment, "gray"),
                         width=0.6
                     ))
-                    fig.add_trace(go.Scatter(
+                    fig1.add_trace(go.Scatter(
                         x=[treatment] * len(sub),
                         y=sub["CN/DG"],
                         mode="markers",
                         marker=dict(color="black", size=10),
+                        name=treatment,
                         showlegend=False
                     ))
 
-                # Naïve diagonal label
-                naive_rows = df[df["Treatment"] == "Naïve"]
-                if not naive_rows.empty and mean_val > 0:
-                    naive_name = naive_rows.iloc[0]["Animal"] + " Naïve reference"
-                    fig.add_annotation(text=naive_name, x="Naïve", y=mean_val * 0.6,
-                                       showarrow=False, textangle=-35, font=dict(size=12, color="gray"))
+                if not pd.isna(naive_mean):
+                    fig1.add_hline(y=naive_mean, line_dash="dash", line_color="gray",
+                                   annotation_text="Naïve reference", annotation_position="top left")
 
-                fig.update_layout(
-                    title=f"<b>{study}</b> – {df.iloc[0]['Tissue Type']} – Day {df.iloc[0]['Takedown Day']}<br>Normalized CN/DG",
-                    yaxis_title="CN/DG",
+                fig1.update_layout(
+                    title=f"<b>{study}</b> – {subtitle}<br>{fam_probe} / {vic_probe} normalized CN/DG",
+                    yaxis_title="Copies per diploid genome (CN/DG)",
                     template="simple_white",
-                    font=dict(size=18),
                     height=700
                 )
-                st.plotly_chart(fig, use_container_width=True)
-                png = fig.to_image(format="png", width=1200, height=800, scale=2)
-                st.download_button(f"📸 Download {study} figure", png, f"{study}_CN_DG.png", "image/png", key=study)
+                st.plotly_chart(fig1, use_container_width=True)
+                st.download_button(f"Download {study} – Normalized", fig1.to_image(format="png", scale=2),
+                                   f"{study}_CN_DG.png", "image/png", key=f"norm_{study}")
+
+            else:
+                # 2. FAM loading
+                fig_fam = go.Figure()
+                for treatment in df["Treatment"].unique():
+                    sub = df[df["Treatment"] == treatment]
+                    fig_fam.add_trace(go.Bar(
+                        name=treatment,
+                        x=[treatment],
+                        y=[sub["FAM"].mean()],
+                        error_y=dict(type="data", array=[sub["FAM"].sem()]),
+                        marker_color=color_map.get(treatment, "gray")
+                    ))
+                fig_fam.update_layout(title=f"<b>{study}</b> – {subtitle}<br>{fam_probe} loading (copies/µL)",
+                                      yaxis_title="FAM copies/µL", template="simple_white", height=600)
+                st.plotly_chart(fig_fam, use_container_width=True)
+
+                # 3. VIC loading
+                fig_vic = go.Figure()
+                for treatment in df["Treatment"].unique():
+                    sub = df[df["Treatment"] == treatment]
+                    fig_vic.add_trace(go.Bar(
+                        name=treatment,
+                        x=[treatment],
+                        y=[sub["VIC"].mean()],
+                        error_y=dict(type="data", array=[sub["VIC"].sem()]),
+                        marker_color=color_map.get(treatment, "gray")
+                    ))
+                fig_vic.update_layout(title=f"<b>{study}</b> – {subtitle}<br>{vic_probe} loading (copies/µL)",
+                                      yaxis_title="VIC copies/µL", template="simple_white", height=600)
+                st.plotly_chart(fig_vic, use_container_width=True)
 
 else:
-    st.info("Upload the three files above to get started. When your run is finished, drop the QuantaSoft results CSV for instant graphs.")
-
+    st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done."
