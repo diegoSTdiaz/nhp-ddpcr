@@ -349,7 +349,7 @@ if results_file:
             label=tr,
             value=color_map.get(tr, "gray"),
             key=f"color_{tr}"
-        )   # ← THIS ) WAS MISSING BEFORE
+        )
         
 # ====================== SECTION 8: GENERATE PLOTS PER STUDY ======================
         for study in sorted(final["Study ID"].dropna().unique()):
@@ -449,6 +449,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
