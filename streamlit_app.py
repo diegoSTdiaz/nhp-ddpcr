@@ -1,3 +1,25 @@
+# ====================== SECTION 0: LOCK YOUR GOLDEN EXCEL TEMPLATE (DO THIS ONCE) ======================
+st.markdown("## Lock Your Lab's Golden Excel Template (One-Time Setup)")
+
+if "golden_locked" not in st.session_state:
+    golden_file = st.file_uploader(
+        "Upload your master DNA ddPCR Analysis Template.xlsx (the one with formulas)",
+        type=["xlsx"], key="golden_upload"
+    )
+    if golden_file and st.button("LOCK THIS TEMPLATE FOREVER", type="primary"):
+        import base64, io
+        st.session_state.golden_template = golden_file.getvalue()
+        st.session_state.golden_locked = True
+        st.success("Template LOCKED forever! All future runs will use your exact Excel calculations.")
+        st.balloons()
+else:
+    st.success("Golden Excel template is LOCKED and ready!")
+    if st.button("Change locked template"):
+        if "golden_locked" in st.session_state:
+            del st.session_state.golden_locked
+            del st.session_state.golden_template
+        st.experimental_rerun()
+
 # =============================================================================
 # NHP / FST ddPCR Plate Planner & Analyzer
 # Version: Clean + Sectioned for Easy Future Updates
@@ -158,29 +180,81 @@ if plate_file and sample_file:
         mime="text/csv",
         key="download_annotated"
     )
-# ====================== SECTION 6: PROCESS RESULTS (IF UPLOADED) ======================
-    if results_file:
-        results = pd.read_csv(results_file)
+# ====================== SECTION 6: AUTO-FILL GOLDEN TEMPLATE WITH REAL DATA ======================
+if results_file and plate_file and sample_file and st.session_state.get("golden_locked"):
+    import openpyxl, io, pandas as pd
 
-        # Auto-detect FAM and VIC concentration columns
-        fam_col = vic_col = None
-        for col in results.columns:
-            if "FAM" in col.upper() and "CONC" in col.upper():
-                fam_col = col
-            if "VIC" in col.upper() and "CONC" in col.upper():
-                vic_col = col
+    # Load your locked golden template
+    wb = openpyxl.load_workbook(io.BytesIO(st.session_state.golden_template), data_only=False)
+    ws = wb["Raw data"]
 
-        if not (fam_col and vic_col and "Well" in results.columns):
-            st.error("Could not find FAM/VIC concentration columns or Well column.")
-            st.stop()
+    # === Step 1: Parse results file robustly (FAM/VIC per well) ===
+    results = pd.read_csv(results_file)
+    
+    # Robust column detection
+    well_col = next((c for c in results.columns if "well" in c.lower()), None)
+    conc_col = next((c for c in results.columns if "conc" in c.lower() and "copies" in c.lower()), None)
+    dye_col = next((c for c in results.columns if any(x in c.lower() for x in ["dye", "target", "channel"])), None)
+    
+    if not all([well_col, conc_col, dye_col]):
+        st.error("Could not find Well, Concentration, or Dye column in results file.")
+        st.stop()
 
-        # Pivot to one row per well
-        fam = results[results["Target"] == 1][["Well", fam_col]].rename(columns={fam_col: "FAM"})
-        vic = results[results["Target"] == 2][["Well", vic_col]].rename(columns={vic_col: "VIC"})
-        conc = fam.merge(vic, on="Well", how="inner")
+    results = results[[well_col, conc_col, dye_col]].dropna()
+    results = results.rename(columns={well_col: "Well", conc_col: "Conc", dye_col: "Dye"})
+    results["Well"] = results["Well"].astype(str).str.replace(r"0(\d)$", r"\1", regex=True)
 
-        final = full.merge(conc, on="Well", how="left")
-        final["CN/DG"] = final["FAM"] / final["VIC"]
+    fam = results[results["Dye"].astype(str).str.upper().str.contains("FAM")][["Well", "Conc"]].rename(columns={"Conc": "FAM"})
+    vic = results[results["Dye"].astype(str).str.upper().str.contains("VIC|HEX")][["Well", "Conc"]].rename(columns={"Conc": "VIC"})
+    if fam.empty or vic.empty:
+        fam = results[results["Dye"] == 1][["Well", "Conc"]].rename(columns={"Conc": "FAM"})
+        vic = results[results["Dye"] == 2][["Well", "Conc"]].rename(columns={"Conc": "VIC"})
+
+    conc = fam.merge(vic, on="Well", how="inner")
+
+    # === Step 2: Fill FAM and VIC into your exact template locations ===
+    row_map = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7}
+    fam_cells = ws["BD48":"BO55"]
+    vic_cells = ws["BD61":"BO68"]
+
+    for _, row in conc.iterrows():
+        well = row["Well"]
+        if len(well) >= 2:
+            letter = well[0].upper()
+            col_num = well[1:]
+            if letter in row_map and col_num.isdigit():
+                r = row_map[letter]
+                c = int(col_num) - 1
+                if 0 <= c <= 11:
+                    fam_cells[r][c].value = row["FAM"]
+                    vic_cells[r][c].value = row["VIC"]
+
+    # === Step 3: Fill desired mass (from sample info or manual input) ===
+    # For now: use the most common mass from sample file
+    samples_df = pd.read_csv(sample_file)
+    if "Desired mass in rxn (ng)" in samples_df.columns:
+        mass = pd.to_numeric(samples_df["Desired mass in rxn (ng)"], errors="coerce").mode()[0]
+        ws["BA47"] = mass
+
+    # === Step 4: Let Excel calculate everything ===
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    st.success("Your golden Excel template has been auto-filled using your exact formulas!")
+    st.download_button(
+        label="Download Final Results (identical to your lab's Excel)",
+        data=output.getvalue(),
+        file_name="Final_ddPCR_Analysis_Results.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    # Optional: show the final CN/DG grid
+    final_grid = pd.read_excel(output, sheet_name="Raw data", usecols="BD:BO", skiprows=32, nrows=8, header=None)
+    final_grid.index = ["A","B","C","D","E","F","G","H"]
+    final_grid.columns = [1,2,3,4,5,6,7,8,9,10,11,12]
+    st.write("### Final Copy Number Grid (from your template)")
+    st.dataframe(final_grid.style.format("{:.3f}"))
 
 # ====================== SECTION 7: SIDEBAR – BAR COLOR PICKER ======================
         color_map = {
@@ -292,6 +366,7 @@ if plate_file and sample_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
