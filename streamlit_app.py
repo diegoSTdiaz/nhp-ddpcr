@@ -14,13 +14,11 @@ with col1:
 
 with col2:
     st.subheader("2. Sample Info (6 columns only)")
-    sample_file = st.file_uploader("Sample Number → Study ID, Treatment, Animal, Tissue, Day", type=["csv"], key="samples")
+    sample_file = st.file_uploader("Sample Number → Study ID, Treatment, Animal, Tissue Type, Takedown Day", type=["csv"], key="samples")
 
-# Optional results
 st.markdown("---")
 results_file = st.file_uploader("Finished run → QuantaSoft/QX200 results CSV (optional now)", type=["csv"], key="results")
 
-# Assay selector
 st.markdown("---")
 st.subheader("Assay & Loading Settings")
 
@@ -41,7 +39,7 @@ with col_c:
     show_loading = st.checkbox("Show raw loading (copies/µL) instead of CN/DG", value=False)
 
 if plate_file and sample_file:
-    # ====================== Load plate layout ======================
+    # Load plate layout
     plate = pd.read_csv(plate_file)
     plate.columns = [""] + [f"{i}" for i in plate.columns[1:]]
     plate = plate.set_index(plate.columns[0])
@@ -50,7 +48,6 @@ if plate_file and sample_file:
     plate_long["Well"] = plate_long["Row"] + plate_long["Column"].str.replace(".0", "")
     plate_long = plate_long[["Well", "Sample Number"]].dropna()
 
-    # Handle both numeric sample numbers and text NTCs
     def to_sample(x):
         try:
             return int(x)
@@ -58,7 +55,7 @@ if plate_file and sample_file:
             return str(x)
     plate_long["Sample Number"] = plate_long["Sample Number"].apply(to_sample)
 
-    # ====================== Load sample metadata ======================
+    # Load sample metadata
     samples = pd.read_csv(sample_file)
     required = ["Sample Number", "Study ID", "Treatment", "Animal", "Tissue Type", "Takedown Day"]
     if not all(c in samples.columns for c in required):
@@ -87,7 +84,7 @@ if plate_file and sample_file:
             st.error("Could not find FAM/VIC concentration columns.")
             st.stop()
 
-        # Pivot results to one row per well
+        # Pivot to one row per well
         fam = results[results["Target"] == 1][["Well", fam_col]].rename(columns={fam_col: "FAM"})
         vic = results[results["Target"] == 2][["Well", vic_col]].rename(columns={vic_col: "VIC"})
         conc = fam.merge(vic, on="Well", how="inner")
