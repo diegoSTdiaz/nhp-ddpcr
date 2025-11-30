@@ -23,38 +23,54 @@ load_persistent_state()   # ← this line makes it permanent
 # Version: Clean + Sectioned for Easy Future Updates
 # =============================================================================
 
-# ====================== SECTION 0: LOCK YOUR GOLDEN EXCEL TEMPLATE (PERSISTENT!) ======================
-# This makes the template survive refresh, new tabs, and Streamlit Cloud cold starts
+# ====================== SECTION 0: LOCK YOUR GOLDEN EXCEL TEMPLATE (REALLY PERMANENT) ======================
+# This version survives refresh, redeploy, and multiple users on Streamlit Cloud
 
-# Enable persistent session state
-if "golden_locked" not in st.session_state:
+import streamlit as st
+import pickle
+import os
+
+# Path where the locked template will be saved forever on the server
+TEMPLATE_PATH = ".golden_template.pkl"
+
+# Load from disk on startup (if exists)
+if os.path.exists(TEMPLATE_PATH):
+    with open(TEMPLATE_PATH, "rb") as f:
+        saved = pickle.load(f)
+        st.session_state.golden_template = saved["bytes"]
+        st.session_state.golden_locked = True
+else:
     st.session_state.golden_locked = False
-if "golden_template" not in st.session_state:
-    st.session_state.golden_template = None
 
-# Show uploader ONLY if not locked
+# ————————————————————————
+# UI – only shows uploader when NOT locked
+# ————————————————————————
 if not st.session_state.golden_locked:
-    st.markdown("## Lock Your Lab's Golden Excel Template (One-Time Setup)")
-    st.info("Upload your master DNA ddPCR Analysis Template.xlsx **once only** — it will be remembered forever.")
+    st.markdown("## Lock Your Lab's Golden Excel Template (One-Time Only)")
+    st.info("Upload your master DNA ddPCR Analysis Template.xlsx once – it will be saved permanently on the server.")
 
     golden_file = st.file_uploader(
         "Upload your golden DNA ddPCR Analysis Template.xlsx",
         type=["xlsx"],
-        key="golden_upload"
+        key="golden_once"
     )
 
     if golden_file and st.button("LOCK THIS TEMPLATE FOREVER", type="primary"):
+        # Save to disk so it survives everything
+        with open(TEMPLATE_PATH, "wb") as f:
+            pickle.dump({"bytes": golden_file.getvalue()}, f)
         st.session_state.golden_template = golden_file.getvalue()
         st.session_state.golden_locked = True
-        st.success("Template LOCKED permanently!")
+        st.success("Template permanently LOCKED on the server!")
         st.balloons()
         st.rerun()
 
 else:
-    st.success("Golden Excel template is LOCKED and ready to use!")
+    st.success("Golden Excel template is permanently LOCKED and ready!")
     
-    # Tiny button to change it later if needed
-    if st.button("Change / Unlock template"):
+    if st.button("Unlock / Replace template (admin only)"):
+        if os.path.exists(TEMPLATE_PATH):
+            os.remove(TEMPLATE_PATH)
         st.session_state.golden_locked = False
         st.session_state.golden_template = None
         st.rerun()
@@ -401,6 +417,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
