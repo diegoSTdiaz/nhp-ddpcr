@@ -9,8 +9,8 @@ import plotly.graph_objects as go
 
 # ====================== SECTION 1: PAGE CONFIG & TITLE ======================
 st.set_page_config(page_title="NHP ddPCR Analyzer", layout="wide")
-st.title("NHP / FST ddPCR Plate Planner & Analyzer")
-st.markdown("**New & improved**: only 2 required files + smart assay selector")
+st.title("ddPCR Automated Analysis with Graphs")
+st.markdown("**Simple Upload**: only 3 required files")
 
 # ====================== SECTION 2: FILE UPLOADERS ======================
 col1, col2 = st.columns(2)
@@ -34,7 +34,7 @@ with col2:
 # Optional results file
 st.markdown("---")
 results_file = st.file_uploader(
-    "Finished run → QuantaSoft/QX200 results CSV (optional now)",
+    "Finished run → QXManager results CSV (optional now)",
     type=["csv"],
     key="results"
 )
@@ -236,3 +236,4 @@ if plate_file and sample_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
