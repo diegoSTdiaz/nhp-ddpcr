@@ -113,7 +113,7 @@ if plate_file and sample_file:
     # --- Hard-coded expected columns (exact names and order) ---
     expected_sample_cols = [
         "Sample Number", "Study ID", "Treatment",
-        "Animal", "Tissue Type", "Takedown Day"
+        "Animal", "Tissue Type", "Takedown Day", "Desired mass in rxn (ng)"
     ]
 
     # Auto-map uploaded columns to expected ones (case-insensitive, flexible)
@@ -286,6 +286,7 @@ if plate_file and sample_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
