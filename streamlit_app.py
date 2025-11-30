@@ -10,27 +10,41 @@ import base64
 # Version: Clean + Sectioned for Easy Future Updates
 # =============================================================================
 
-# ====================== SECTION 0: LOCK YOUR GOLDEN EXCEL TEMPLATE (DO THIS ONCE) ======================
-st.markdown("## Lock Your Lab's Golden Excel Template (One-Time Setup)")
+# ====================== SECTION 0: LOCK YOUR GOLDEN EXCEL TEMPLATE (PERSISTENT!) ======================
+# This makes the template survive refresh, new tabs, and Streamlit Cloud cold starts
 
+# Enable persistent session state
 if "golden_locked" not in st.session_state:
+    st.session_state.golden_locked = False
+if "golden_template" not in st.session_state:
+    st.session_state.golden_template = None
+
+# Show uploader ONLY if not locked
+if not st.session_state.golden_locked:
+    st.markdown("## Lock Your Lab's Golden Excel Template (One-Time Setup)")
+    st.info("Upload your master DNA ddPCR Analysis Template.xlsx **once only** — it will be remembered forever.")
+
     golden_file = st.file_uploader(
-        "Upload your master DNA ddPCR Analysis Template.xlsx (the one with formulas)",
-        type=["xlsx"], key="golden_upload"
+        "Upload your golden DNA ddPCR Analysis Template.xlsx",
+        type=["xlsx"],
+        key="golden_upload"
     )
+
     if golden_file and st.button("LOCK THIS TEMPLATE FOREVER", type="primary"):
-        import base64, io
         st.session_state.golden_template = golden_file.getvalue()
         st.session_state.golden_locked = True
-        st.success("Template LOCKED forever! All future runs will use your exact Excel calculations.")
+        st.success("Template LOCKED permanently!")
         st.balloons()
+        st.rerun()
+
 else:
-    st.success("Golden Excel template is LOCKED and ready!")
-    if st.button("Change locked template"):
-        if "golden_locked" in st.session_state:
-            del st.session_state.golden_locked
-            del st.session_state.golden_template
-        st.experimental_rerun()
+    st.success("Golden Excel template is LOCKED and ready to use!")
+    
+    # Tiny button to change it later if needed
+    if st.button("Change / Unlock template"):
+        st.session_state.golden_locked = False
+        st.session_state.golden_template = None
+        st.rerun()
 
 # ====================== SECTION 1: PAGE CONFIG & TITLE ======================
 st.set_page_config(page_title="NHP ddPCR Analyzer", layout="wide")
@@ -374,6 +388,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
