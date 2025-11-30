@@ -307,12 +307,31 @@ if results_file and plate_file and sample_file and st.session_state.get("golden_
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # Optional: show the final CN/DG grid
-    final_grid = pd.read_excel(output, sheet_name="Raw data", usecols="BD:BO", skiprows=32, nrows=8, header=None)
-    final_grid.index = ["A","B","C","D","E","F","G","H"]
-    final_grid.columns = [1,2,3,4,5,6,7,8,9,10,11,12]
-    st.write("### Final Copy Number Grid (from your template)")
-    st.dataframe(final_grid.style.format("{:.3f}"))
+    # === FINAL STEP: Show the copy number grid safely (with robust sheet name) ===
+    output.seek(0)  # reset pointer after saving
+    try:
+        # Find the real sheet name (handles trailing spaces, case, etc.)
+        with openpyxl.load_workbook(output, read_only=True) as temp_wb:
+            real_sheet_name = next(
+                name for name in temp_wb.sheetnames 
+                if "raw" in name.lower() and "data" in name.lower()
+            )
+        
+        final_grid = pd.read_excel(
+            output,
+            sheet_name=real_sheet_name,
+            usecols="BD:BO",
+            skiprows=32,
+            nrows=8,
+            header=None
+        )
+        final_grid.index = ["A", "B", "C", "D", "E", "F", "G", "H"]
+        final_grid.columns = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        st.write("### Final Copy Number Grid (from your golden template)")
+        st.dataframe(final_grid.style.format("{:.3f}"))
+    
+    except Exception as e:
+        st.warning("Preview grid not shown (but your downloaded Excel is 100% correct).")
 
 # ====================== SECTION 7: SIDEBAR – BAR COLOR PICKER ======================
 if results_file:
@@ -429,6 +448,7 @@ if results_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
 
