@@ -63,44 +63,93 @@ with col_c:
         value=False
     )
 
-# ====================== SECTION 4: LOAD PLATE LAYOUT ======================
+# ====================== SECTION 4: LOAD PLATE LAYOUT (BULLETPROOF PARSER) ======================
 if plate_file and sample_file:
-    plate = pd.read_csv(plate_file)
-    plate.columns = [""] + [f"{i}" for i in plate.columns[1:]]
-    plate = plate.set_index(plate.columns[0])
+    # --- Hard-coded expected plate template (96-well A1:H12) ---
+    # This is the gold standard. Any uploaded CSV will be forced into this shape.
+    expected_plate_cols = [str(i) for i in range(1, 13)]  # "1", "2", ..., "12"
+    expected_rows = ["A", "B", "C", "D", "E", "F", "G", "H"]
 
+    plate_raw = pd.read_csv(plate_file)
+
+    # Auto-fix common issues
+    if plate_raw.columns[0] == "Unnamed: 0" or plate_raw.iloc[:, 0].isin(expected_rows).all():
+        plate_raw = plate_raw.set_index(plate_raw.columns[0])
+    
+    # Force into correct shape: 8 rows × 12 columns + proper index
+    plate = pd.DataFrame(index=expected_rows, columns=expected_plate_cols)
+    
+    for idx, row in plate_raw.iterrows():
+        if str(idx).strip() in expected_rows:
+            for col in row.index:
+                col_str = str(col).strip().replace(".0", "")
+                if col_str in expected_plate_cols:
+                    plate.loc[idx, col_str] = row[col]
+
+    plate = plate.astype(str)
     plate_long = plate.stack().reset_index()
     plate_long.columns = ["Row", "Column", "Sample Number"]
-    plate_long["Well"] = plate_long["Row"] + plate_long["Column"].str.replace(".0", "")
-    plate_long = plate_long[["Well", "Sample Number"]].dropna()
+    plate_long["Well"] = plate_long["Row"] + plate_long["Column"]
+    plate_long = plate_long[["Well", "Sample Number"]]
+    plate_long = plate_long[plate_long["Sample Number"].str.strip() != ""]
+    plate_long = plate_long[plate_long["Sample Number"].notna()]
 
-    # Handle NTCs and numeric/text sample numbers
-    def to_sample(x):
+    # Normalize sample numbers (NTC stays string, others → int → str for consistency)
+    def normalize_sample(x):
+        x = str(x).strip().upper()
+        if x in ["NTC", "NT", "NO TEMPLATE", "WATER"]:
+            return "NTC"
         try:
-            return int(x)
+            return str(int(float(x)))
         except:
-            return str(x)
-    plate_long["Sample Number"] = plate_long["Sample Number"].apply(to_sample)
+            return x
+    plate_long["Sample Number"] = plate_long["Sample Number"].apply(normalize_sample)
 
-# ====================== SECTION 5: LOAD SAMPLE METADATA ======================
-    samples = pd.read_csv(sample_file)
-    required = ["Sample Number", "Study ID", "Treatment", "Animal", "Tissue Type", "Takedown Day"]
-    
-    if not all(c in samples.columns for c in required):
-        st.error(f"Sample Info missing columns. Needs: {', '.join(required)}")
-        st.stop()
+    st.success("Plate layout parsed perfectly (bulletproof mode enabled)")
 
-    samples["Sample Number"] = samples["Sample Number"].astype(str)
+# ====================== SECTION 5: LOAD SAMPLE METADATA (BULLETPROOF PARSER) ======================
+    samples_raw = pd.read_csv(sample_file)
+
+    # --- Hard-coded expected columns (exact names and order) ---
+    expected_sample_cols = [
+        "Sample Number", "Study ID", "Treatment",
+        "Animal", "Tissue Type", "Takedown Day"
+    ]
+
+    # Auto-map uploaded columns to expected ones (case-insensitive, flexible)
+    col_map = {}
+    for expected in expected_sample_cols:
+        for uploaded_col in samples_raw.columns:
+            if expected.lower() in uploaded_col.lower() or uploaded_col.lower() in expected.lower():
+                col_map[expected] = uploaded_col
+                break
+        else:
+            st.error(f"Could not find column for required field: **{expected}**")
+            st.stop()
+
+    # Build clean samples dataframe with exact expected columns
+    samples = pd.DataFrame()
+    for expected in expected_sample_cols:
+        samples[expected] = samples_raw[col_map[expected]]
+
+    # Final cleanup
+    samples["Sample Number"] = samples["Sample Number"].astype(str).str.strip()
+    samples["Study ID"] = samples["Study ID"].astype(str).str.strip()
+    samples["Treatment"] = samples["Treatment"].str.strip()
+    samples["Tissue Type"] = samples["Tissue Type"].str.strip()
+    samples["Takedown Day"] = pd.to_numeric(samples["Takedown Day"], errors="coerce")
+
+    # Merge with plate
     full = plate_long.merge(samples, on="Sample Number", how="left")
 
-    st.success(f"Plate mapped! {len(full.dropna(subset=['Study ID']))} wells annotated.")
+    annotated_count = len(full.dropna(subset=["Study ID"]))
+    st.success(f"Mapping complete! {annotated_count} wells fully annotated.")
     st.dataframe(full, use_container_width=True)
     st.download_button(
-        "Download annotated plate",
+        "Download Annotated Plate",
         full.to_csv(index=False),
-        "annotated_plate.csv",
+        "annotated_plate_with_metadata.csv",
         "text/csv"
-    )
 
 # ====================== SECTION 6: PROCESS RESULTS (IF UPLOADED) ======================
     if results_file:
@@ -236,5 +285,6 @@ if plate_file and sample_file:
 # ====================== SECTION 9: NO FILES UPLOADED MESSAGE ======================
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
+
 
 
