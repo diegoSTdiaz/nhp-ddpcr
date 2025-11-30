@@ -172,6 +172,3 @@ if plate_file and sample_file:
 
 else:
     st.info("Upload Plate Layout + Sample Info to begin. Add results CSV when run is done.")
-
-
-
