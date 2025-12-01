@@ -1,6 +1,6 @@
 # app.py
 import streamlit as st
-from utils.plate import create_plate_df, render_interactive_plate, update_well_mass
+from utils.plate import create_plate_df, render_interactive_plate
 from utils.parser import parse_qxmanager_csv
 from utils.calculator import calculate_copies_per_sample
 import pandas as pd
@@ -219,4 +219,5 @@ def calculate_copies_per_sample(qx_data, plate_df):
         })
 
     return pd.DataFrame(results)
+
 
