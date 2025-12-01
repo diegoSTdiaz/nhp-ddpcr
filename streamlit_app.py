@@ -141,7 +141,7 @@ def create_plate_df(plate_layout_df, study_info_df, default_ng, user_overrides):
     # Apply user manual overrides
     for well, ng in user_overrides.items():
         if well in plate["Well"].values:
-            plate.loc[plate["Well"] == well,-doped "DNA_ng"] = ng
+            plate.loc[plate["Well"] == well.upper(), "DNA_ng"] = float(ng)
 
     return plate
 
@@ -219,3 +219,4 @@ def calculate_copies_per_sample(qx_data, plate_df):
         })
 
     return pd.DataFrame(results)
+
